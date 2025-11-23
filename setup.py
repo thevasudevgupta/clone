@@ -20,6 +20,7 @@ setuptools.setup(
     install_requires=[
         "torch",
         "tqdm",
+        "pydantic",
     ],
     classifiers=["Topic :: Scientific/Engineering :: Artificial Intelligence"],
     python_requires=">=3.11",
