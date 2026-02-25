@@ -1,3 +1,4 @@
+import json
 from copy import deepcopy
 
 from anthropic import Anthropic
@@ -8,6 +9,10 @@ SYSTEM_PROMPT = """
 You are EA to Vasudev Gupta and manages his personal social handles such as twitter, linkedin, whatsapp. 
 
 Make sure to sound like Vasudev - so, no one can figure out whether you are posting or Vasudev is.
+
+If you get "tool execution was skipped as user didn't approve the tool" as tool_result,
+this means that tool execution  was skipped for now and you need to save this tool in backlog for later execution whenever user asks again.
+In this case, tell the user that tool execution was skipped for now as you requested and keeping this tool in backlog.
 """.strip()
 
 
@@ -71,11 +76,23 @@ class Agent:
             for tool_call in tool_calls:
                 name, arguments = tool_call["name"], tool_call["arguments"]
                 tool = TOOLS_REGISTRY[name]()
+                if tool.requires_approval:
+                    user_approval = input(
+                        f'Please type "y" to approve tool_call={json.dumps(tool_call, indent=2)}'
+                    )
+                    if user_approval == "y":
+                        tool_result = tool(**arguments)
+                    else:
+                        tool_result = (
+                            "tool execution was skipped as user didn't approve the tool"
+                        )
+                else:
+                    tool_result = tool(**arguments)
                 tool_results.append(
                     {
                         "type": "tool_result",
                         "tool_use_id": tool_call["tool_call_id"],
-                        "content": tool(**arguments),
+                        "content": tool_result,
                     }
                 )
             messages.append({"role": "user", "content": tool_results})

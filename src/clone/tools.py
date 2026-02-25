@@ -35,8 +35,10 @@ def request_serper(query: str):
 
 @register_tool
 class WebSearchTool:
+    requires_approval = False
+
     schema = {
-        "name": "websearch",
+        "name": "web_search",
         "description": "web search tool which has acess to Google.",
         "input_schema": {
             "type": "object",
@@ -58,9 +60,10 @@ class WebSearchTool:
 
 
 @register_tool
-class TwitterTool:
+class GetTweetTool:
+    requires_approval = False
     schema = {
-        "name": "twitter",
+        "name": "get_tweet",
         "description": "use this tool to fetch & read tweets",
         "input_schema": {
             "type": "object",
@@ -78,9 +81,6 @@ class TwitterTool:
         self.client = get_tweepy()
 
     def __call__(self, tweet_id: str):
-        return self.get_tweet(tweet_id)
-
-    def get_tweet(self, tweet_id):
         tweet_fields = ["conversation_id", "author_id", "note_tweet"]
         tweet = self.client.get_tweet(
             tweet_id, user_auth=True, tweet_fields=tweet_fields
@@ -99,3 +99,32 @@ class TwitterTool:
                 tweet.note_tweet["text"] if hasattr(tweet, "note_tweet") else tweet.text
             ]
         return "\n".join(res)
+
+
+@register_tool
+class WriteTweetTool:
+    requires_approval = True
+    schema = {
+        "name": "write_tweet",
+        "description": "use this tool to write tweet on behalf of @thevasudevgupta",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tweet": {
+                    "type": "string",
+                    "description": "text of tweet; Note: tweet will be actually be published on twitter/X.",
+                },
+            },
+            "required": ["tweet"],
+        },
+    }
+
+    def __init__(self):
+        self.client = get_tweepy()
+
+    def __call__(self, tweet):
+        try:
+            self.client.create_tweet(text=tweet)
+            return "Tweet succesfully published on @thevasudevgupta account."
+        except Exception as e:
+            return f"write_tweet failed with exception: {e}"

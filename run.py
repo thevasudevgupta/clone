@@ -8,7 +8,7 @@ from clone.utils import convert_messages_to_string
 
 # prompt = "Who is Vasudev Gupta?"
 # messages = [{"role": "user", "content": prompt}]
-agent = Agent(enable_thinking=True)
+agent = Agent(enable_thinking=False)
 # messages = agent(messages, max_requests=4)
 prompt = "how are you doing?"
 messages = agent.start(prompt)
