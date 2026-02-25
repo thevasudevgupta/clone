@@ -1,3 +1,1 @@
-# inferllm
-
-this project is work in progress. you can safely ignore this repo for now. follow [x.com/thevasudevgupta](https://x.com/thevasudevgupta) for updates on release etc.
+this project aims to clone every activity I do. follow [x.com/thevasudevgupta](https://x.com/thevasudevgupta) for updates.
