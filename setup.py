@@ -6,19 +6,18 @@ with open("README.md", "r", encoding="utf-8") as file:
     long_description = file.read()
 
 setuptools.setup(
-    name="inferllm",
+    name="clone",
     version=__version__,
     author="Vasudev Gupta",
     author_email="7vasudevgupta@gmail.com",
-    description="LLM inference!",
+    description="personal clone of @thevasudevgupta",
     long_description=long_description,
     long_description_content_type="text/markdown",
     license="MIT",
-    url="https://github.com/thevasudevgupta/inferllm",
+    url="https://github.com/thevasudevgupta/clone",
     package_dir={"": "src"},
     packages=setuptools.find_packages("src"),
     install_requires=[
-        "torch",
         "tqdm",
         "pydantic",
     ],
