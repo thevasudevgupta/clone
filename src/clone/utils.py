@@ -1,4 +1,7 @@
 import json
+import os
+
+import tweepy
 
 
 def convert_messages_to_string(messages):
@@ -47,3 +50,12 @@ def convert_messages_to_string(messages):
 
         string.append(res)
     return "\n".join(string)
+
+
+def get_tweepy():
+    return tweepy.Client(
+        consumer_key=os.getenv("X_CONSUMER_KEY"),
+        consumer_secret=os.getenv("X_CONSUMER_SECRET"),
+        access_token=os.getenv("X_ACCESS_TOKEN"),
+        access_token_secret=os.getenv("X_ACCESS_TOKEN_SECRET"),
+    )

@@ -4,11 +4,16 @@ from anthropic import Anthropic
 
 from .tools import TOOLS_REGISTRY
 
+SYSTEM_PROMPT = """
+You are EA to Vasudev Gupta and manages his personal social handles such as twitter, linkedin, whatsapp. 
+
+Make sure to sound like Vasudev - so, no one can figure out whether you are posting or Vasudev is.
+""".strip()
+
 
 class Agent:
     def __init__(
         self,
-        # model: str = "claude-opus-4-5-20251101",
         model: str = "claude-sonnet-4-5",
         max_tokens: int = 16_384,
         enable_thinking: bool = False,
@@ -20,6 +25,8 @@ class Agent:
         self.thinking_budget = thinking_budget
 
         self.tools = [tool.schema for tool in TOOLS_REGISTRY.values()]
+        self.system_prompt = SYSTEM_PROMPT
+
         self.client = Anthropic()
 
     def request_model(self, messages):
@@ -28,20 +35,18 @@ class Agent:
             if self.enable_thinking
             else {"type": "disabled"}
         )
-        # https://platform.claude.com/docs/en/build-with-claude/extended-thinking#interleaved-thinking
-        # above docs shows how to use beta headers for interleaved thinking
-        # NOTE: we are using BETA API here because interleaved thinking is supported only for this one
-        response = self.client.beta.messages.create(
+        response = self.client.messages.create(
             model=self.model,
             messages=messages,
             tools=self.tools,
+            system=self.system_prompt,
             max_tokens=self.max_tokens,
             thinking=thinking,
-            betas=["interleaved-thinking-2025-05-14"],
         )
         content = [part.model_dump() for part in response.content]
         return {"role": "assistant", "content": content}
 
+    # TODO: are you sure that we want to modify messages in-place?
     def __call__(self, messages, max_requests=10):
         messages = deepcopy(messages)
 
@@ -88,4 +93,14 @@ class Agent:
             ]
             num_requests += 1
 
+        return messages
+
+    def start(self, prompt):
+        messages = [{"role": "user", "content": prompt}]
+        print("User:", prompt)
+        for _ in range(5):
+            messages = self(messages, max_requests=4)
+            print("Assistant:", messages[-1]["content"])
+            prompt = input("User: ")
+            messages += [{"role": "user", "content": prompt}]
         return messages

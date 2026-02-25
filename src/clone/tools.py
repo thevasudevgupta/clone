@@ -3,6 +3,8 @@ import os
 
 import requests
 
+from .utils import get_tweepy
+
 TOOLS_REGISTRY = {}
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 
@@ -50,3 +52,50 @@ class WebSearchTool:
 
     def __call__(self, query: str):
         return request_serper(query)
+
+
+# TODO: implement webfetch tool asap!
+
+
+@register_tool
+class TwitterTool:
+    schema = {
+        "name": "twitter",
+        "description": "use this tool to fetch & read tweets",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tweet_id": {
+                    "type": "string",
+                    "description": "tweet ID which you want to read",
+                },
+            },
+            "required": ["tweet_id"],
+        },
+    }
+
+    def __init__(self):
+        self.client = get_tweepy()
+
+    def __call__(self, tweet_id: str):
+        return self.get_tweet(tweet_id)
+
+    def get_tweet(self, tweet_id):
+        tweet_fields = ["conversation_id", "author_id", "note_tweet"]
+        tweet = self.client.get_tweet(
+            tweet_id, user_auth=True, tweet_fields=tweet_fields
+        ).data
+        query = f"conversation_id:{tweet.conversation_id} from:{tweet.author_id}"
+        res = []
+        # TODO: why do we need to handle 1st tweet separately?
+        res += [
+            tweet.note_tweet["text"] if hasattr(tweet, "note_tweet") else tweet.text
+        ]
+        thread = self.client.search_recent_tweets(
+            query=query, user_auth=True, tweet_fields=tweet_fields
+        )
+        for tweet in sorted(thread.data, key=lambda x: x.id):
+            res += [
+                tweet.note_tweet["text"] if hasattr(tweet, "note_tweet") else tweet.text
+            ]
+        return "\n".join(res)

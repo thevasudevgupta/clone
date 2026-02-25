@@ -5,17 +5,11 @@
 # agent should make suggestions only for now; and requires approval before posting
 # agent should get triggered only once every 10 seconds?
 
-from dotenv import load_dotenv
-assert load_dotenv()
-import tweepy
 
-import os
-client = tweepy.Client(
-    consumer_key=os.getenv("X_CONSUMER_KEY"),
-    consumer_secret=os.getenv("X_CONSUMER_SECRET"),
-    access_token=os.getenv("X_ACCESS_TOKEN"),
-    access_token_secret=os.getenv("X_ACCESS_TOKEN_SECRET"),
-)
+from dotenv import load_dotenv
+
+assert load_dotenv()
+
 
 user_id = client.get_me().data.id
 print(user_id)
@@ -36,16 +30,5 @@ print(user_id)
 # and then create a tweet about paper upon approval of user
 # NOTE: we want to control WRITE action programmatically;
 
-def get_tweet(tweet_id):
-    tweet_fields = ["conversation_id", "author_id", "note_tweet"]
-    tweet = client.get_tweet(tweet_id, user_auth=True, tweet_fields=tweet_fields).data
-    query = f"conversation_id:{tweet.conversation_id} from:{tweet.author_id}"
-    res = []
-    # TODO: why do we need to handle 1st tweet separately?
-    res += [tweet.note_tweet["text"] if hasattr(tweet, "note_tweet") else tweet.text]
-    thread = client.search_recent_tweets(query=query, user_auth=True, tweet_fields=tweet_fields)
-    for tweet in sorted(thread.data, key=lambda x: x.id):
-        res += [tweet.note_tweet["text"] if hasattr(tweet, "note_tweet") else tweet.text]
-    return "\n".join(res)
 
 print(get_tweet("2026765820098130111"))
