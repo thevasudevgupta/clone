@@ -57,6 +57,14 @@ class WebSearchTool:
 
 
 # TODO: implement webfetch tool asap!
+# TODO: model should summarise its history somewhere
+# basically manage its own memory - so, we can drop super long conversations
+# shall we do in aws s3? we should store versions?
+# TODO: implement whatsapp tomorrow; and lets chat with some friends over there using safeclaw
+# and see if they feel natural
+# we also need to let safeclaw know how we talk
+# probably need some kinda memory about me - lets use YAML for that?
+# TODO: agent should get triggered only once every 10 seconds?
 
 
 @register_tool
@@ -79,28 +87,27 @@ class GetTweetTool:
 
     def __init__(self):
         self.client = get_tweepy()
+        self._kwargs = {
+            "user_auth": True,
+            "tweet_fields": ["conversation_id", "author_id", "note_tweet"],
+        }
+
+    def _get_text(self, tweet):
+        return tweet.note_tweet["text"] if hasattr(tweet, "note_tweet") else tweet.text
 
     def __call__(self, tweet_id: str):
-        tweet_fields = ["conversation_id", "author_id", "note_tweet"]
-        tweet = self.client.get_tweet(
-            tweet_id, user_auth=True, tweet_fields=tweet_fields
-        ).data
-        query = f"conversation_id:{tweet.conversation_id} from:{tweet.author_id}"
-        res = []
+        tweet = self.client.get_tweet(tweet_id, **self._kwargs).data
         # TODO: why do we need to handle 1st tweet separately?
-        res += [
-            tweet.note_tweet["text"] if hasattr(tweet, "note_tweet") else tweet.text
-        ]
-        thread = self.client.search_recent_tweets(
-            query=query, user_auth=True, tweet_fields=tweet_fields
-        )
-        for tweet in sorted(thread.data, key=lambda x: x.id):
-            res += [
-                tweet.note_tweet["text"] if hasattr(tweet, "note_tweet") else tweet.text
-            ]
+        res = [self._get_text(tweet)]
+        query = f"conversation_id:{tweet.conversation_id} from:{tweet.author_id}"
+        thread = self.client.search_recent_tweets(query=query, **self._kwargs)
+        if thread.data is not None:
+            for tweet in sorted(thread.data, key=lambda x: x.id):
+                res += [self._get_text(tweet)]
         return "\n".join(res)
 
 
+# TODO: add support of quote tweet, reply tweet?
 @register_tool
 class WriteTweetTool:
     requires_approval = True

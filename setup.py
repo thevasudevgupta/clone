@@ -6,15 +6,15 @@ with open("README.md", "r", encoding="utf-8") as file:
     long_description = file.read()
 
 setuptools.setup(
-    name="clone",
+    name="safeclaw",
     version=__version__,
     author="Vasudev Gupta",
     author_email="7vasudevgupta@gmail.com",
-    description="personal clone of @thevasudevgupta",
+    description="can we make openclaw safe? developed by @thevasudevgupta",
     long_description=long_description,
     long_description_content_type="text/markdown",
     license="MIT",
-    url="https://github.com/thevasudevgupta/clone",
+    url="https://github.com/thevasudevgupta/safeclaw",
     package_dir={"": "src"},
     packages=setuptools.find_packages("src"),
     install_requires=[

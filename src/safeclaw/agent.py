@@ -4,6 +4,7 @@ from copy import deepcopy
 from anthropic import Anthropic
 
 from .tools import TOOLS_REGISTRY
+from .utils import parse_assistant
 
 SYSTEM_PROMPT = """
 You are EA to Vasudev Gupta and manages his personal social handles such as twitter, linkedin, whatsapp. 
@@ -112,12 +113,17 @@ class Agent:
 
         return messages
 
-    def start(self, prompt):
-        messages = [{"role": "user", "content": prompt}]
-        print("User:", prompt)
-        for _ in range(5):
-            messages = self(messages, max_requests=4)
-            print("Assistant:", messages[-1]["content"])
-            prompt = input("User: ")
-            messages += [{"role": "user", "content": prompt}]
+    def start(self):
+        messages = []
+        while True:
+            try:
+                prompt = input("--- User ---\n")
+                messages += [{"role": "user", "content": prompt}]
+                messages = self(messages, max_requests=4)
+                print("--- Assistant ---\n", parse_assistant(messages[-1]["content"]))
+            except KeyboardInterrupt:
+                break
+            except Exception as exception:
+                print(f"--- Failed with exception ---\n{exception}")
+                break
         return messages
