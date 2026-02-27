@@ -9,7 +9,7 @@
 # Enable: View Channels
 # Enable: Read Message History
 # Enable: Send Messages
-# Copy the generated URL & paste to browser to approve
+# Copy, paste the generated URL to browser & approve
 
 import asyncio
 import os
