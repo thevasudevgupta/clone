@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as file:
     long_description = file.read()
 
 setuptools.setup(
-    name="safeclaw",
+    name="tvgbot",
     version=__version__,
     author="Vasudev Gupta",
     author_email="7vasudevgupta@gmail.com",
@@ -14,12 +14,13 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     license="MIT",
-    url="https://github.com/thevasudevgupta/safeclaw",
+    url="https://github.com/thevasudevgupta/tvgbot",
     package_dir={"": "src"},
     packages=setuptools.find_packages("src"),
     install_requires=[
         "tqdm",
         "pydantic",
+        "discord.py",
     ],
     classifiers=["Topic :: Scientific/Engineering :: Artificial Intelligence"],
     python_requires=">=3.11",

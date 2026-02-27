@@ -1,8 +1,10 @@
+import asyncio
 import json
 from copy import deepcopy
 
 from anthropic import Anthropic
 
+from .discord import DiscordClient
 from .tools import TOOLS_REGISTRY
 from .utils import parse_assistant
 
@@ -113,7 +115,29 @@ class Agent:
 
         return messages
 
-    def start(self):
+    def start(self, server="local"):
+        if server == "local":
+            self.start_local()
+        elif server == "discord":
+            asyncio.run(self.start_discord())
+        else:
+            raise ValueError(f"server={server} NOT SUPPORTED")
+
+    # TODO: we should call anthropic api async
+    # TODO: we should do stream mode?
+    async def start_discord(self):
+        client = DiscordClient()
+        await client.start()
+        messages = []
+        while True:
+            message = await client.receive_message()
+            content, channel_id = message["content"], message["channel_id"]
+            messages.append({"role": "user", "content": content})
+            messages = self(messages, max_requests=4)
+            content = parse_assistant(messages[-1]["content"])
+            await client.send_message(content, channel_id)
+
+    def start_local(self):
         messages = []
         while True:
             try:
