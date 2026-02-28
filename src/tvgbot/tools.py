@@ -1,13 +1,17 @@
 import json
 
+from .gmail import GmailClient
 from .linkedin import LinkedinClient
 from .twitter import TwitterClient
 from .websearch import request_serper
 
 twitter_client = TwitterClient()
 linkedin_client = LinkedinClient()
+gmail_client = GmailClient()
+
 TOOL_REGISTRY = {}
-WRITE_REQUIRES_APPROVAL = False
+WRITE_REQUIRES_APPROVAL = True
+# TODO: we need to configure allowed_emails
 
 
 def register_tool(schema, requires_approval=False):
@@ -112,3 +116,69 @@ def write_post_on_linkedin(text):
         return json.dumps({"status": "SUCCESS"})
     except Exception as exception:
         return json.dumps({"status": "FAILED", "exception": exception})
+
+
+@register_tool(
+    schema={
+        "name": "send_email",
+        "description": "Use this tool to send email",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "to": {
+                    "type": "string",
+                    "description": "One or more recipient email addresses. Use commas to separate multiple addresses.",
+                },
+                "subject": {
+                    "type": "string",
+                    "description": "subject of email.",
+                },
+                "body": {
+                    "type": "string",
+                    "description": "body of email.",
+                },
+            },
+            "required": ["to", "subject", "body"],
+        },
+    },
+    requires_approval=WRITE_REQUIRES_APPROVAL,
+)
+def send_email(to, subject, body):
+    try:
+        gmail_client.send_email(to, subject, body)
+        return json.dumps({"status": "SUCCESS"})
+    except Exception as exception:
+        return json.dumps({"status": "FAILED", "exception": exception})
+
+
+@register_tool(
+    schema={
+        "name": "list_emails",
+        "description": "Use this tool to list emails.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": ["string", "null"],
+                    "description": (
+                        "Optional Gmail search query string used to filter messages. "
+                        "Must follow Gmail search syntax exactly as used in the Gmail web interface "
+                        "(e.g., 'is:unread', 'from:example@gmail.com', "
+                        "'newer_than:7d', 'after:2026/02/01 before:2026/02/28'). "
+                        "Multiple filters can be combined using spaces."
+                    ),
+                    "default": None,
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "max number of results to fetch.",
+                    "default": 10,
+                },
+            },
+        },
+    },
+    requires_approval=False,
+)
+def list_emails(query=None, max_results=10):
+    emails = gmail_client.list_emails(query=query, max_results=max_results)
+    return f"```json\n{json.dumps(emails, indent=2)}\n```"

@@ -24,6 +24,7 @@ setuptools.setup(
         "fire",
         "black",
         "isort",
+        "ipdb",
         "anthropic",
         "tweepy",
         "discord.py",
