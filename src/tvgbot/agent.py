@@ -140,6 +140,7 @@ class Agent:
             raise ValueError(f"server={server} NOT SUPPORTED")
 
     # TODO: truncate each content to have 128 chars - instead of current truncation
+    # stream reasoning - message by message - ideally in thread
     def get_internal_reasoning(self, messages):
         reasoning = convert_messages_to_string(messages)
         if len(reasoning) > 1024:

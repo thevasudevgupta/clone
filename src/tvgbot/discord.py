@@ -51,6 +51,9 @@ class DiscordClient:
 
     async def start(self):
         asyncio.create_task(self.client.start(self.api_token))
+        # https://discordapp.com/channels/1476906398934630521/1477003441111826664
+        await asyncio.sleep(2)
+        await self.send_message("✅ tvgbot connected!", 1477003441111826664)
 
     async def send_message(self, text: str, channel_id: int):
         channel = self.client.get_channel(channel_id)
