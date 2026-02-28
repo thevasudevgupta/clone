@@ -6,7 +6,7 @@ from anthropic import Anthropic
 
 from .discord import DiscordClient
 from .tools import TOOLS_REGISTRY
-from .utils import parse_assistant
+from .utils import convert_messages_to_string, parse_assistant
 
 SYSTEM_PROMPT = """
 You are tvgbot, EA to Vasudev Gupta. Your job is to help Vasudev in day-to-day activities.
@@ -31,6 +31,8 @@ In this case, tell the user that tool execution was skipped for now as you reque
 """.strip()
 
 
+# TODO: add support for open-router as well - we want to understand how cogito model does here
+# this way we will understand where our models stands compared to claude on real world tasks with our harness
 class Agent:
     def __init__(
         self,
@@ -127,17 +129,26 @@ class Agent:
 
         return messages
 
-    def start(self, server="local"):
+    def start(self, server="local", max_requests_per_prompt=4):
         if server == "local":
-            self.start_local()
+            self.start_local(max_requests_per_prompt=max_requests_per_prompt)
         elif server == "discord":
-            asyncio.run(self.start_discord())
+            asyncio.run(
+                self.start_discord(max_requests_per_prompt=max_requests_per_prompt)
+            )
         else:
             raise ValueError(f"server={server} NOT SUPPORTED")
 
+    # TODO: truncate each content to have 128 chars - instead of current truncation
+    def get_internal_reasoning(self, messages):
+        reasoning = convert_messages_to_string(messages)
+        if len(reasoning) > 1024:
+            reasoning = "... " + reasoning[-1024:]
+        return reasoning
+
     # TODO: we should call anthropic api async
     # TODO: we should do stream mode?
-    async def start_discord(self):
+    async def start_discord(self, max_requests_per_prompt=4):
         client = DiscordClient()
         await client.start()
         messages = []
@@ -145,17 +156,22 @@ class Agent:
             message = await client.receive_message()
             content, channel_id = message["content"], message["channel_id"]
             messages.append({"role": "user", "content": content})
-            messages = self(messages, max_requests=4)
+            messages = self(messages, max_requests=max_requests_per_prompt)
+
+            # https://discordapp.com/channels/1476906398934630521/1477105203126861854
+            internal_reasoning = self.get_internal_reasoning(messages)
+            await client.send_message(internal_reasoning, 1477105203126861854)
+
             content = parse_assistant(messages[-1]["content"])
             await client.send_message(content, channel_id)
 
-    def start_local(self):
+    def start_local(self, max_requests_per_prompt=4):
         messages = []
         while True:
             try:
                 prompt = input("--- User ---\n")
                 messages += [{"role": "user", "content": prompt}]
-                messages = self(messages, max_requests=4)
+                messages = self(messages, max_requests=max_requests_per_prompt)
                 print("--- Assistant ---\n", parse_assistant(messages[-1]["content"]))
             except KeyboardInterrupt:
                 break

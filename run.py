@@ -1,4 +1,4 @@
-# python3 run.py --server=discord
+# python3 run.py --server=discord --max_requests_per_prompt=20
 
 # PLAN
 # ai should get its own credit card
@@ -16,9 +16,9 @@ from dotenv import load_dotenv
 assert load_dotenv()
 from tvgbot.agent import Agent
 
-def main(server: str = "local"):
+def main(server: str = "local", max_requests_per_prompt: int = 4):
     agent = Agent()
-    agent.start(server=server)
+    agent.start(server=server, max_requests_per_prompt=max_requests_per_prompt)
 
 
 if __name__ == "__main__":
