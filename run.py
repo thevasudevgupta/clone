@@ -18,14 +18,13 @@
 # it should be controlled by simple discord channel
 
 import fire
-import json
 from dotenv import load_dotenv
 assert load_dotenv()
 from tvgbot.agent import Agent
 
 def main(server: str = "local", max_requests_per_prompt: int = 4):
     agent = Agent()
-    print(json.dumps(agent.tools, indent=2))
+    print("Available Tools:", [tool["name"] for tool in agent.tools])
     agent.start(server=server, max_requests_per_prompt=max_requests_per_prompt)
 
 

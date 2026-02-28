@@ -1,3 +1,5 @@
+import json
+
 from .linkedin import LinkedinClient
 from .twitter import TwitterClient
 from .websearch import request_serper
@@ -80,7 +82,11 @@ def get_tweet(tweet_id):
     requires_approval=WRITE_REQUIRES_APPROVAL,
 )
 def write_tweet(text):
-    return twitter_client.create_tweet(text)
+    try:
+        twitter_client.create_tweet(text)
+        return json.dumps({"status": "SUCCESS"})
+    except Exception as exception:
+        return json.dumps({"status": "FAILED", "exception": exception})
 
 
 @register_tool(
@@ -101,4 +107,8 @@ def write_tweet(text):
     requires_approval=WRITE_REQUIRES_APPROVAL,
 )
 def write_post_on_linkedin(text):
-    return linkedin_client.create_post(text)
+    try:
+        linkedin_client.create_post(text)
+        return json.dumps({"status": "SUCCESS"})
+    except Exception as exception:
+        return json.dumps({"status": "FAILED", "exception": exception})

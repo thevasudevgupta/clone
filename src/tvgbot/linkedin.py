@@ -54,5 +54,3 @@ class LinkedinClient:
             f"{self.base_url}/posts", headers=self.headers, json=payload
         )
         response.raise_for_status()
-        response = json.dumps(response.json())
-        return response

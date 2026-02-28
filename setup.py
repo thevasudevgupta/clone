@@ -22,6 +22,8 @@ setuptools.setup(
         "pydantic",
         "python-dotenv",
         "fire",
+        "black",
+        "isort",
         "anthropic",
         "tweepy",
         "discord.py",

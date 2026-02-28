@@ -37,7 +37,6 @@ class DiscordClient:
 
         @self.client.event
         async def on_message(message):
-            print(message)
             if message.author.bot:
                 return
             await self.q.put(

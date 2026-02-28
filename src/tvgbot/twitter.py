@@ -40,8 +40,4 @@ class TwitterClient:
         return "\n".join(res)
 
     def create_tweet(self, tweet):
-        try:
-            self.client.create_tweet(text=tweet)
-            return "Tweet succesfully published on @thevasudevgupta account."
-        except Exception as e:
-            return f"write_tweet failed with exception: {e}"
+        self.client.create_tweet(text=tweet)
