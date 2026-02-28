@@ -1,43 +1,27 @@
-import json
-import os
+from .linkedin import LinkedinClient
+from .twitter import TwitterClient
+from .websearch import request_serper
 
-import requests
-
-from .utils import get_tweepy
-
-TOOLS_REGISTRY = {}
-SERPER_API_KEY = os.getenv("SERPER_API_KEY")
-
-
-def register_tool(cls):
-    global TOOLS_REGISTRY
-    TOOLS_REGISTRY[cls.schema["name"]] = cls
-    return cls
+twitter_client = TwitterClient()
+linkedin_client = LinkedinClient()
+TOOL_REGISTRY = {}
+WRITE_REQUIRES_APPROVAL = False
 
 
-def request_serper(query: str):
-    assert SERPER_API_KEY is not None
-    url = "https://google.serper.dev/search"
-    payload = {"q": query}
-    headers = {
-        "X-API-KEY": SERPER_API_KEY,
-        "Content-Type": "application/json",
-    }
-    response = requests.request("POST", url, headers=headers, json=payload)
-    response = json.loads(response.text)["organic"]
-    result = []
-    for i, doc in enumerate(response, 1):
-        title, snippet = doc["title"], doc.get("snippet")
-        result.append(f'[{i}]"{title}\n{snippet}"')
-    result = "\n\n".join(result)
-    return f"```\n{result}\n```"
+def register_tool(schema, requires_approval=False):
+    global TOOL_REGISTRY
+    assert schema["name"] not in TOOL_REGISTRY
+
+    def _register(fn):
+        fn.schema = schema
+        fn.requires_approval = requires_approval
+        TOOL_REGISTRY[schema["name"]] = fn
+
+    return _register
 
 
-@register_tool
-class WebSearchTool:
-    requires_approval = False
-
-    schema = {
+@register_tool(
+    schema={
         "name": "web_search",
         "description": "web search tool which has acess to Google.",
         "input_schema": {
@@ -50,27 +34,15 @@ class WebSearchTool:
             },
             "required": ["query"],
         },
-    }
-
-    def __call__(self, query: str):
-        return request_serper(query)
-
-
-# TODO: implement webfetch tool asap!
-# TODO: model should summarise its history somewhere
-# basically manage its own memory - so, we can drop super long conversations
-# shall we do in aws s3? we should store versions?
-# TODO: implement whatsapp tomorrow; and lets chat with some friends over there using safeclaw
-# and see if they feel natural
-# we also need to let safeclaw know how we talk
-# probably need some kinda memory about me - lets use YAML for that?
-# TODO: agent should get triggered only once every 10 seconds?
+    },
+    requires_approval=False,
+)
+def websearch(query):
+    return request_serper(query)
 
 
-@register_tool
-class GetTweetTool:
-    requires_approval = False
-    schema = {
+@register_tool(
+    schema={
         "name": "get_tweet",
         "description": "use this tool to fetch & read tweets",
         "input_schema": {
@@ -83,55 +55,50 @@ class GetTweetTool:
             },
             "required": ["tweet_id"],
         },
-    }
-
-    def __init__(self):
-        self.client = get_tweepy()
-        self._kwargs = {
-            "user_auth": True,
-            "tweet_fields": ["conversation_id", "author_id", "note_tweet"],
-        }
-
-    def _get_text(self, tweet):
-        return tweet.note_tweet["text"] if hasattr(tweet, "note_tweet") else tweet.text
-
-    def __call__(self, tweet_id: str):
-        tweet = self.client.get_tweet(tweet_id, **self._kwargs).data
-        # TODO: why do we need to handle 1st tweet separately?
-        res = [self._get_text(tweet)]
-        query = f"conversation_id:{tweet.conversation_id} from:{tweet.author_id}"
-        thread = self.client.search_recent_tweets(query=query, **self._kwargs)
-        if thread.data is not None:
-            for tweet in sorted(thread.data, key=lambda x: x.id):
-                res += [self._get_text(tweet)]
-        return "\n".join(res)
+    },
+    requires_approval=False,
+)
+def get_tweet(tweet_id):
+    return twitter_client.get_tweet(tweet_id)
 
 
-# TODO: add support of quote tweet, reply tweet?
-@register_tool
-class WriteTweetTool:
-    requires_approval = True
-    schema = {
+@register_tool(
+    schema={
         "name": "write_tweet",
-        "description": "use this tool to write tweet on behalf of @thevasudevgupta",
+        "description": "use this tool to write tweet on behalf of Vasudev Gupta.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "tweet": {
+                "text": {
                     "type": "string",
-                    "description": "text of tweet; Note: tweet will be actually be published on twitter/X.",
+                    "description": "text to tweet on twitter/X",
                 },
             },
-            "required": ["tweet"],
+            "required": ["text"],
         },
-    }
+    },
+    requires_approval=WRITE_REQUIRES_APPROVAL,
+)
+def write_tweet(text):
+    return twitter_client.create_tweet(text)
 
-    def __init__(self):
-        self.client = get_tweepy()
 
-    def __call__(self, tweet):
-        try:
-            self.client.create_tweet(text=tweet)
-            return "Tweet succesfully published on @thevasudevgupta account."
-        except Exception as e:
-            return f"write_tweet failed with exception: {e}"
+@register_tool(
+    schema={
+        "name": "write_post_on_linkedin",
+        "description": "use this tool to write post on linkedin behalf of Vasudev Gupta.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "text to post on linkedin",
+                }
+            },
+            "required": ["text"],
+        },
+    },
+    requires_approval=WRITE_REQUIRES_APPROVAL,
+)
+def write_post_on_linkedin(text):
+    return linkedin_client.create_post(text)

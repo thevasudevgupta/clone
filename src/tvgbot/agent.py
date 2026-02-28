@@ -5,7 +5,7 @@ from copy import deepcopy
 from anthropic import Anthropic
 
 from .discord import DiscordClient
-from .tools import TOOLS_REGISTRY
+from .tools import TOOL_REGISTRY
 from .utils import convert_messages_to_string, parse_assistant
 
 SYSTEM_PROMPT = """
@@ -46,7 +46,7 @@ class Agent:
         self.enable_thinking = enable_thinking
         self.thinking_budget = thinking_budget
 
-        self.tools = [tool.schema for tool in TOOLS_REGISTRY.values()]
+        self.tools = [tool.schema for tool in TOOL_REGISTRY.values()]
         self.system_prompt = SYSTEM_PROMPT
 
         self.client = Anthropic()
@@ -92,7 +92,7 @@ class Agent:
             tool_results = []
             for tool_call in tool_calls:
                 name, arguments = tool_call["name"], tool_call["arguments"]
-                tool = TOOLS_REGISTRY[name]()
+                tool = TOOL_REGISTRY[name]
                 if tool.requires_approval:
                     user_approval = input(
                         f'Please type "y" to approve tool_call={json.dumps(tool_call, indent=2)}'
@@ -169,14 +169,14 @@ class Agent:
     def start_local(self, max_requests_per_prompt=4):
         messages = []
         while True:
-            try:
-                prompt = input("--- User ---\n")
-                messages += [{"role": "user", "content": prompt}]
-                messages = self(messages, max_requests=max_requests_per_prompt)
-                print("--- Assistant ---\n", parse_assistant(messages[-1]["content"]))
-            except KeyboardInterrupt:
-                break
-            except Exception as exception:
-                print(f"--- Failed with exception ---\n{exception}")
-                break
+            prompt = input("--- User ---\n")
+            messages += [{"role": "user", "content": prompt}]
+            messages = self(messages, max_requests=max_requests_per_prompt)
+            print("--- Assistant ---\n", parse_assistant(messages[-1]["content"]))
+            # try:
+            # except KeyboardInterrupt:
+            #     break
+            # except Exception as exception:
+            #     print(f"--- Failed with exception ---\n{exception}")
+            #     break
         return messages

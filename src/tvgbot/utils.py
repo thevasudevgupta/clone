@@ -1,7 +1,4 @@
 import json
-import os
-
-import tweepy
 
 
 def parse_user(user_content):
@@ -51,16 +48,3 @@ def convert_messages_to_string(messages):
             raise ValueError(f"Invalid role={role}")
         string.append(res)
     return "\n".join(string)
-
-
-def get_tweepy():
-    # $1 for client.get_users_following(user_id, user_auth=True)
-    # $0.5 for client.get_home_timeline()
-    # $0.01 for client.create_tweet(text=...)
-    # $0.05 for get_users_tweets(user_id)
-    return tweepy.Client(
-        consumer_key=os.getenv("X_CONSUMER_KEY"),
-        consumer_secret=os.getenv("X_CONSUMER_SECRET"),
-        access_token=os.getenv("X_ACCESS_TOKEN"),
-        access_token_secret=os.getenv("X_ACCESS_TOKEN_SECRET"),
-    )
