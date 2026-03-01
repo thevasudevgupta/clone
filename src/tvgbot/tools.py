@@ -90,7 +90,7 @@ def write_tweet(text):
         twitter_client.create_tweet(text)
         return json.dumps({"status": "SUCCESS"})
     except Exception as exception:
-        return json.dumps({"status": "FAILED", "exception": exception})
+        return json.dumps({"status": "FAILED", "exception": str(exception)})
 
 
 @register_tool(
@@ -115,7 +115,7 @@ def write_post_on_linkedin(text):
         linkedin_client.create_post(text)
         return json.dumps({"status": "SUCCESS"})
     except Exception as exception:
-        return json.dumps({"status": "FAILED", "exception": exception})
+        return json.dumps({"status": "FAILED", "exception": str(exception)})
 
 
 @register_tool(
@@ -148,7 +148,7 @@ def send_email(to, subject, body):
         gmail_client.send_email(to, subject, body)
         return json.dumps({"status": "SUCCESS"})
     except Exception as exception:
-        return json.dumps({"status": "FAILED", "exception": exception})
+        return json.dumps({"status": "FAILED", "exception": str(exception)})
 
 
 @register_tool(

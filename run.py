@@ -1,4 +1,4 @@
-# python3 run.py --server=discord --max_requests_per_prompt=20
+# screen -L -md python3 run.py --server=discord --max_requests_per_prompt=20
 
 # PLAN
 # ai should get its own credit card
@@ -20,12 +20,14 @@
 import fire
 from dotenv import load_dotenv
 assert load_dotenv()
-from tvgbot.agent import Agent
+from tvgbot.agent import LocalAgent, DiscordAgent
+
 
 def main(server: str = "local", max_requests_per_prompt: int = 4):
-    agent = Agent()
+    assert server in {"local", "discord"}
+    agent = DiscordAgent() if server == "discord" else LocalAgent()
     print("Available Tools:", [tool["name"] for tool in agent.tools])
-    agent.start(server=server, max_requests_per_prompt=max_requests_per_prompt)
+    agent.start(max_requests_per_prompt=max_requests_per_prompt)
 
 
 if __name__ == "__main__":

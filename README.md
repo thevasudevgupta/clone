@@ -10,8 +10,12 @@ this will be my virtual clone soon. follow [x.com/thevasudevgupta](https://x.com
 gcloud auth login
 gcloud config set project tvgbot
 
+# Run following command to HostName
+gcloud compute instances describe tvgbot --zone us-central1-c --format="get(networkInterfaces[0].accessConfigs[0].natIP)"
+
+# replace ${HostName} with result from previous command
 echo 'Host tvgbot
-    HostName $(gcloud compute instances describe tvgbot --zone us-central1-c --format="get(networkInterfaces[0].accessConfigs[0].natIP)")
+    HostName ${HostName}
     User vasudevgupta
     IdentityFile ~/.ssh/google_compute_engine' >> ~/.ssh/config
 

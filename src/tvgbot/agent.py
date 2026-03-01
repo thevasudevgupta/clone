@@ -33,7 +33,7 @@ In this case, tell the user that tool execution was skipped for now as you reque
 
 # TODO: add support for open-router as well - we want to understand how cogito model does here
 # this way we will understand where our models stands compared to claude on real world tasks with our harness
-class Agent:
+class LocalAgent:
     def __init__(
         self,
         model: str = "claude-sonnet-4-5",
@@ -68,14 +68,8 @@ class Agent:
         content = [part.model_dump() for part in response.content]
         return {"role": "assistant", "content": content}
 
-    # TODO: are you sure that we want to modify messages in-place?
-    def __call__(self, messages, max_requests=10):
-        messages = deepcopy(messages)
-
-        response = self.request_model(messages)
-        messages.append(response)
-
-        tool_calls = [
+    def get_tool_calls(self, response):
+        return [
             {
                 "tool_call_id": part["id"],
                 "name": part["name"],
@@ -84,6 +78,15 @@ class Agent:
             for part in response["content"]
             if part["type"] == "tool_use"
         ]
+
+    async def request_user_approval(self, prompt, **kwargs):
+        return input(prompt)
+
+    async def __call__(self, input_messages, max_requests=10, **kwargs):
+        response = self.request_model(input_messages)
+        output_messages = [response]
+
+        tool_calls = self.get_tool_calls(response)
         num_requests = 1
         while len(tool_calls) > 0:
             if num_requests >= max_requests:
@@ -94,15 +97,13 @@ class Agent:
                 name, arguments = tool_call["name"], tool_call["arguments"]
                 tool = TOOL_REGISTRY[name]
                 if tool.requires_approval:
-                    user_approval = input(
-                        f'Please type "y" to approve tool_call={json.dumps(tool_call, indent=2)}'
+                    prompt = f'Please type "approve" to approve\n```\n{tool.__name__}(**{json.dumps(arguments, indent=2)})\n```'
+                    user_response = await self.request_user_approval(prompt, **kwargs)
+                    tool_result = (
+                        tool(**arguments)
+                        if user_response.lower() == "approve"
+                        else "Skipped tool execution as user DID NOT approve."
                     )
-                    if user_approval == "y":
-                        tool_result = tool(**arguments)
-                    else:
-                        tool_result = (
-                            "tool execution was skipped as user didn't approve the tool"
-                        )
                 else:
                     tool_result = tool(**arguments)
                 tool_results.append(
@@ -112,71 +113,89 @@ class Agent:
                         "content": tool_result,
                     }
                 )
-            messages.append({"role": "user", "content": tool_results})
-            response = self.request_model(messages)
-            messages.append(response)
+            output_messages += [{"role": "user", "content": tool_results}]
+            response = self.request_model(input_messages + output_messages)
+            output_messages += [response]
 
-            tool_calls = [
-                {
-                    "tool_call_id": part["id"],
-                    "name": part["name"],
-                    "arguments": part["input"],
-                }
-                for part in response["content"]
-                if part["type"] == "tool_use"
-            ]
+            tool_calls = self.get_tool_calls(response)
             num_requests += 1
 
+        return output_messages
+
+    def start(self, max_requests_per_prompt=4):
+        messages = []
+        while True:
+            prompt = input("--- User ---\n")
+            messages += [{"role": "user", "content": prompt}]
+            try:
+                output_messages = asyncio.run(
+                    self(messages, max_requests=max_requests_per_prompt)
+                )
+            except KeyboardInterrupt:
+                break
+            except Exception as exception:
+                print(f"--- Failed with exception ---\n{exception}")
+                messages.pop()
+                continue
+            messages += output_messages
+            print("--- Assistant ---\n", parse_assistant(messages[-1]["content"]))
         return messages
 
-    def start(self, server="local", max_requests_per_prompt=4):
-        if server == "local":
-            self.start_local(max_requests_per_prompt=max_requests_per_prompt)
-        elif server == "discord":
-            asyncio.run(
-                self.start_discord(max_requests_per_prompt=max_requests_per_prompt)
-            )
-        else:
-            raise ValueError(f"server={server} NOT SUPPORTED")
 
-    # TODO: truncate each content to have 128 chars - instead of current truncation
+# TODO: we should call anthropic api async
+# TODO: we should do stream mode?
+# TODO: discord thread can be supported nicely?
+# TODO: maybe reasoning should be sent back within a file?
+class DiscordAgent(LocalAgent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.discord_client = DiscordClient()
+
+    async def request_user_approval(self, prompt, **kwargs):
+        await self.discord_client.send_message(prompt, kwargs["channel_id"])
+        response = await self.discord_client.receive_message()
+        return response["content"]
+
+    def start(self, max_requests_per_prompt=4):
+        asyncio.run(self.start_discord(max_requests_per_prompt=max_requests_per_prompt))
+
+    async def start_discord(self, max_requests_per_prompt=4):
+        await self.discord_client.start()
+        messages = []
+        while True:
+            message = await self.discord_client.receive_message()
+            content, channel_id = message["content"], message["channel_id"]
+            messages += [{"role": "user", "content": content}]
+
+            try:
+                output_messages = await self(
+                    messages,
+                    max_requests=max_requests_per_prompt,
+                    channel_id=channel_id,
+                )
+            except KeyboardInterrupt:
+                break
+            except Exception as exception:
+                await self.discord_client.send_message(
+                    f"--- Failed with exception ---\n{exception}", channel_id
+                )
+                messages.pop()
+                continue
+
+            messages += output_messages
+            content = parse_assistant(messages[-1]["content"])
+            await self.discord_client.send_message(content, channel_id)
+
+            internal_reasoning = self.get_internal_reasoning(output_messages)
+            await self.discord_client.send_message(
+                internal_reasoning,
+                channel_id,
+                self.discord_client.bot_last_message["message_id"],
+            )
+
     # stream reasoning - message by message - ideally in thread
     def get_internal_reasoning(self, messages):
         reasoning = convert_messages_to_string(messages)
         if len(reasoning) > 1024:
             reasoning = "... " + reasoning[-1024:]
-        return reasoning
-
-    # TODO: we should call anthropic api async
-    # TODO: we should do stream mode?
-    async def start_discord(self, max_requests_per_prompt=4):
-        client = DiscordClient()
-        await client.start()
-        messages = []
-        while True:
-            message = await client.receive_message()
-            content, channel_id = message["content"], message["channel_id"]
-            messages.append({"role": "user", "content": content})
-            messages = self(messages, max_requests=max_requests_per_prompt)
-
-            # https://discordapp.com/channels/1476906398934630521/1477105203126861854
-            internal_reasoning = self.get_internal_reasoning(messages)
-            await client.send_message(internal_reasoning, 1477105203126861854)
-
-            content = parse_assistant(messages[-1]["content"])
-            await client.send_message(content, channel_id)
-
-    def start_local(self, max_requests_per_prompt=4):
-        messages = []
-        while True:
-            prompt = input("--- User ---\n")
-            messages += [{"role": "user", "content": prompt}]
-            messages = self(messages, max_requests=max_requests_per_prompt)
-            print("--- Assistant ---\n", parse_assistant(messages[-1]["content"]))
-            # try:
-            # except KeyboardInterrupt:
-            #     break
-            # except Exception as exception:
-            #     print(f"--- Failed with exception ---\n{exception}")
-            #     break
-        return messages
+        return f"```\n{reasoning}\n```"
