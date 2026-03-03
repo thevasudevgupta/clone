@@ -77,7 +77,5 @@ class GmailClient:
 
     def list_emails(self, query=None, max_results=10):
         cmd = self.service.list(userId="me", q=query, maxResults=max_results)
-        print(cmd)
         response = cmd.execute().get("messages", [])
-        print(response)
         return [self.read_email(info["id"]) for info in response]

@@ -7,11 +7,11 @@ from anthropic import Anthropic
 
 from .discord import DiscordClient
 from .tools import TOOL_REGISTRY
-from .utils import convert_messages_to_string, parse_assistant
+from .utils import (convert_messages_to_string, get_answer, get_truncated,
+                    parse_assistant, parse_user)
 
 # TODO: check if gmail returns the date in email?
 # tell gmail that it has access to top 10 emails only? so, need to design query accordingly
-#
 
 SYSTEM_PROMPT = f"""
 You are the Executive Assistant of Vasudev Gupta.
@@ -171,7 +171,7 @@ class LocalAgent:
                 messages.pop()
                 continue
             messages += output_messages
-            print("--- Assistant ---\n", parse_assistant(messages[-1]["content"]))
+            print("--- Assistant ---\n", get_answer(messages[-1]["content"]))
         return messages
 
 
@@ -204,41 +204,42 @@ class DiscordAgent(LocalAgent):
             content, channel_id = message["content"], message["channel_id"]
             messages += [{"role": "user", "content": content}]
 
-            output_messages = await self(
-                messages,
-                max_requests=max_requests_per_prompt,
-                channel_id=channel_id,
-            )
-
-            # try:
-            #     output_messages = await self(
-            #         messages,
-            #         max_requests=max_requests_per_prompt,
-            #         channel_id=channel_id,
-            #     )
-            # except KeyboardInterrupt:
-            #     break
-            # except Exception as exception:
-            #     await self.discord_client.send_message(
-            #         f"--- Failed with exception ---\n{exception}", channel_id
-            #     )
-            #     messages.pop()
-            #     continue
+            try:
+                output_messages = await self(
+                    messages,
+                    max_requests=max_requests_per_prompt,
+                    channel_id=channel_id,
+                )
+            except KeyboardInterrupt:
+                break
+            except Exception as exception:
+                await self.discord_client.send_message(
+                    f"--- Failed with exception ---\n{exception}", channel_id
+                )
+                messages.pop()
+                continue
 
             messages += output_messages
-            content = parse_assistant(messages[-1]["content"])
-            await self.discord_client.send_message(content, channel_id)
-
-            internal_reasoning = self.get_internal_reasoning(output_messages)
-            await self.discord_client.send_message(
-                internal_reasoning,
+            await self.send_internal_reasoning(
+                output_messages,
                 channel_id,
-                self.discord_client.bot_last_message["message_id"],
+                self.discord_client.user_last_message["message_id"],
             )
 
-    # stream reasoning - message by message - ideally in thread
-    def get_internal_reasoning(self, messages):
-        reasoning = convert_messages_to_string(messages)
-        if len(reasoning) > 1024:
-            reasoning = "... " + reasoning[-1024:]
-        return reasoning
+            content = get_answer(messages[-1]["content"])
+            content = get_truncated(content, max_chars=1000)
+            await self.discord_client.send_message(content, channel_id)
+
+    async def send_internal_reasoning(self, output_messages, channel_id, message_id):
+        for x in output_messages:
+            role = x["role"]
+            if role == "user":
+                content = parse_user(x["content"])
+                res = f"<user>\n{content}\n</user>"
+            elif role == "assistant":
+                content = parse_assistant(x["content"])
+                res = f"<assistant>\n{content}\n</assistant>"
+            else:
+                raise ValueError(f"Invalid role={role}")
+            res = get_truncated(res, max_chars=1000)
+            await self.discord_client.send_message(res, channel_id, message_id)

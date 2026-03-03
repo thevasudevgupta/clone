@@ -1,10 +1,16 @@
 import json
 
 
-def get_truncated(text):
-    if len(text) <= 64:
+def get_answer(assistant_content):
+    return "\n".join(
+        [part["text"] for part in assistant_content if part["type"] == "text"]
+    )
+
+
+def get_truncated(text, max_chars=64):
+    if len(text) <= max_chars:
         return text
-    return text[:32].strip() + " ... " + text[-32:].strip()
+    return text[: max_chars // 2].strip() + " ... " + text[-max_chars // 2 :].strip()
 
 
 def parse_user(user_content):

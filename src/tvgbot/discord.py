@@ -29,6 +29,7 @@ class DiscordClient:
 
         self.q = asyncio.Queue()
         self.bot_last_message = None
+        self.user_last_message = None
 
         @self.client.event
         async def on_ready():
@@ -49,8 +50,9 @@ class DiscordClient:
                 }
                 if message.author.bot:
                     self.bot_last_message = data
-                    return
-                await self.q.put(data)
+                else:
+                    self.user_last_message = data
+                    await self.q.put(data)
 
     async def start(self):
         asyncio.create_task(self.client.start(self.api_token))
