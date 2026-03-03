@@ -1,5 +1,6 @@
 import json
 
+from .doc_parser import get_doc
 from .gmail import GmailClient
 from .linkedin import LinkedinClient
 from .twitter import TwitterClient
@@ -43,8 +44,29 @@ def register_tool(schema, requires_approval=False):
     },
     requires_approval=False,
 )
-def websearch(query):
+def web_search(query):
     return request_serper(query)
+
+
+@register_tool(
+    schema={
+        "name": "web_extractor",
+        "description": "get content from a webpage",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "webpage url",
+                },
+            },
+            "required": ["url"],
+        },
+    },
+    requires_approval=False,
+)
+def web_extractor(url):
+    return get_doc(url)
 
 
 @register_tool(

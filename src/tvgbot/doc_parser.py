@@ -1,7 +1,7 @@
-# Most of stuff is directly copied from https://github.com/QwenLM/Qwen-Agent/blob/8bfb20e6d10cd4f1f0250eeda995692cbb76dd47/qwen_agent/tools/simple_doc_parser.py#L31
-# all credit goes to Qwen team for writing so much clean code which works for my use case as well
-# I just adapted as per my needs
-# not worth re-doing parsing files :)
+# lot of stuff is copied from https://github.com/QwenLM/Qwen-Agent/blob/8bfb20e6d10cd4f1f0250eeda995692cbb76dd47/qwen_agent/tools/simple_doc_parser.py#L31
+# all credit goes to Qwen team for writing so much clean code which works reasonable for my use case
+# I just adapted as per my needs ; not worth re-doing all the parsing stuff myself :)
+# however, a lot of url types don't work currently; we need to support them as well
 
 import logging
 import os
@@ -348,16 +348,6 @@ PARSER_SUPPORTED_FILE_TYPES = [
 ]
 
 
-def get_plain_doc(doc: list):
-    paras = []
-    for page in doc:
-        for para in page["content"]:
-            for k, v in para.items():
-                if k in ["text", "table", "image"]:
-                    paras.append(v)
-    return PARAGRAPH_SPLIT_SYMBOL.join(paras)
-
-
 def is_http_url(url):
     return url.startswith("https://") or url.startswith("http://")
 
@@ -419,7 +409,22 @@ def get_file_type(path: str):
             return "txt"
 
 
-def parse_doc(file_path: str, cache_dir=None):
+def get_plain_doc(doc: list):
+    paras = []
+    for page in doc:
+        for para in page["content"]:
+            for k, v in para.items():
+                if k in ["text", "table", "image"]:
+                    paras.append(v)
+    return PARAGRAPH_SPLIT_SYMBOL.join(paras)
+
+
+# TODO: Currently, these links don't work well - they need browser based stuff with playwright
+# url = "https://www.linkedin.com/posts/charlesmartin14_knuth-is-now-vibe-mathing-shock-shock-activity-7434661528378859520-ziOR?utm_source=share&utm_medium=member_desktop&rcm=ACoAACm304YBKyRBusHCwziwrqJebOhHonRd5bI"
+# url = "https://thevasudevgupta.github.io/"
+
+
+def get_doc(file_path: str, cache_dir=None):
     if cache_dir is None:
         cache_dir = "~/.cache/tvgbot"
     cache_dir = Path(cache_dir).expanduser()
@@ -437,7 +442,7 @@ def parse_doc(file_path: str, cache_dir=None):
     if file_type == "pdf":
         doc = parse_pdf(file_path)
     elif file_type == "docx":
-        doc = parse_doc(file_path)
+        doc = parse_word(file_path)
     elif file_type == "pptx":
         doc = parse_ppt(file_path)
     elif file_type == "txt":

@@ -1,14 +1,12 @@
 import asyncio
 import json
-from copy import deepcopy
 from datetime import datetime
 
 from anthropic import Anthropic
 
 from .discord import DiscordClient
 from .tools import TOOL_REGISTRY
-from .utils import (convert_messages_to_string, get_answer, get_truncated,
-                    parse_assistant, parse_user)
+from .utils import get_answer, get_truncated, parse_assistant, parse_user
 
 # TODO: check if gmail returns the date in email?
 # tell gmail that it has access to top 10 emails only? so, need to design query accordingly
@@ -51,14 +49,13 @@ Core Responsibilities:
    - If you receive: "tool execution was skipped as user didn't approve the tool" as a tool_result:
        • Understand that execution was skipped for now.
        • Save that tool action in a backlog for future execution.
-       • Inform the user:
-         "Tool execution was skipped as requested. I’ve saved it in the backlog and will execute it whenever you ask again."
 
 5. Behavioral Rules
    - Act proactively but responsibly.
    - Maintain confidentiality at all times.
    - Never hallucinate facts — verify using available platforms first.
    - Be structured, organized, and execution-focused.
+   - Most importantly, try to be concise. Final Answers to the user should be short.
 
 Today's date is {datetime.now().strftime("%-d %B %Y")}.
 """.strip()
@@ -204,6 +201,8 @@ class DiscordAgent(LocalAgent):
             content, channel_id = message["content"], message["channel_id"]
             messages += [{"role": "user", "content": content}]
 
+            # TODO: don't understand why it re-runs sometimes?
+
             try:
                 output_messages = await self(
                     messages,
@@ -216,10 +215,12 @@ class DiscordAgent(LocalAgent):
                 await self.discord_client.send_message(
                     f"--- Failed with exception ---\n{exception}", channel_id
                 )
-                messages.pop()
+                print("popped:", messages.pop())
                 continue
 
             messages += output_messages
+            # print(json.dumps(output_messages, indent=2))
+
             await self.send_internal_reasoning(
                 output_messages,
                 channel_id,
