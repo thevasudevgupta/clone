@@ -4,18 +4,24 @@
 # not worth re-doing parsing files :)
 
 import logging
+import os
 import re
+import urllib
 from collections import Counter
+from pathlib import Path
 from typing import List
 
 import pandas as pd
 import pdfplumber
+import requests
 from bs4 import BeautifulSoup
 from docx import Document
 from pdfminer.high_level import extract_pages
-from pdfminer.layout import LTChar, LTImage, LTRect, LTTextContainer
+from pdfminer.layout import LTChar, LTRect, LTTextContainer
 from pptx import Presentation
 from tabulate import tabulate
+
+from .utils import hash_sha256, make_request
 
 logger = logging.getLogger(__name__)
 
@@ -231,12 +237,9 @@ def parse_pdf(pdf_path: str) -> List[dict]:
                         new_content_item["font-size"] = round(font[1])
                         # new_content_item['font-name'] = font[0]
                     page["content"].append(new_content_item)
-            elif isinstance(element, LTImage):
-                pass
             else:
-                raise ValueError(
-                    f"Currently, element type = {type(element)} is not supported!"
-                )
+                # Other types such as Image or Figure are not supported for now
+                pass
 
         # merge elements
         page["content"] = postprocess_page_content(page["content"])
@@ -353,3 +356,101 @@ def get_plain_doc(doc: list):
                 if k in ["text", "table", "image"]:
                     paras.append(v)
     return PARAGRAPH_SPLIT_SYMBOL.join(paras)
+
+
+def is_http_url(url):
+    return url.startswith("https://") or url.startswith("http://")
+
+
+def contains_html_tags(text: str) -> bool:
+    pattern = r"<(p|span|div|li|html|script)[^>]*?"
+    return bool(re.search(pattern, text))
+
+
+def get_basename_from_url(path_or_url: str) -> str:
+    # "/mnt/a/b/c" -> "c"
+    # "https://github.com/here?k=v" -> "here"
+    # "https://github.com/" -> ""
+    basename = urllib.parse.urlparse(path_or_url).path
+    basename = os.path.basename(basename)
+    basename = urllib.parse.unquote(basename)
+    basename = basename.strip()
+    # "https://github.com/" -> "" -> "github.com"
+    if not basename:
+        basename = [x.strip() for x in path_or_url.split("/") if x.strip()][-1]
+    return basename
+
+
+def get_content_type_by_head_request(path: str) -> str:
+    try:
+        response = requests.head(path, timeout=5)
+        content_type = response.headers.get("Content-Type", "")
+        return content_type
+    except requests.RequestException:
+        return "unk"
+
+
+def get_file_type(path: str):
+    f_type = get_basename_from_url(path).split(".")[-1].lower()
+    if f_type in ["pdf", "docx", "pptx", "csv", "tsv", "xlsx", "xls"]:
+        return f_type
+
+    if is_http_url(path):
+        # The HTTP header information for the response is obtained by making a HEAD request to the target URL,
+        # where the Content-type field usually indicates the Type of Content to be returned
+        content_type = get_content_type_by_head_request(path)
+        if "application/pdf" in content_type:
+            return "pdf"
+        elif "application/msword" in content_type:
+            return "docx"
+        # Assuming that the URL is HTML by default,
+        # because the file downloaded by the request may contain html tags
+        return "html"
+    else:
+        # Determine by reading local HTML file
+        try:
+            with open(path, "r", encoding="utf-8") as file:
+                content = file.read()
+        except Exception:
+            return "unk"
+        if contains_html_tags(content):
+            return "html"
+        else:
+            return "txt"
+
+
+def parse_doc(file_path: str, cache_dir=None):
+    if cache_dir is None:
+        cache_dir = "~/.cache/tvgbot"
+    cache_dir = Path(cache_dir).expanduser()
+    cache_dir.mkdir(exist_ok=True, parents=True)
+
+    file_type = get_file_type(file_path)
+
+    if is_http_url(file_path):
+        # if file_path is a url, we download it to cache dir
+        response = make_request(file_path)
+        file_path = cache_dir / hash_sha256(file_path)
+        with open(file_path, "wb") as f:
+            f.write(response.content)
+
+    if file_type == "pdf":
+        doc = parse_pdf(file_path)
+    elif file_type == "docx":
+        doc = parse_doc(file_path)
+    elif file_type == "pptx":
+        doc = parse_ppt(file_path)
+    elif file_type == "txt":
+        doc = parse_txt(file_path)
+    elif file_type == "html":
+        doc = parse_html_bs(file_path)
+    elif file_type == "csv":
+        doc = parse_csv(file_path)
+    elif file_type == "tsv":
+        doc = parse_tsv(file_path)
+    elif file_type in {"xlsx", "xls"}:
+        doc = parse_excel(file_path)
+    else:
+        raise ValueError(f"File Type: {file_type} is not supported.")
+
+    return get_plain_doc(doc)
